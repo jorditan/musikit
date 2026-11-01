@@ -1,8 +1,8 @@
-export type SearchType = "artist" | "band" | "song" | "all";
-export type SearchRequest = { name: string; type: SearchType };
+export type SearchType = "artist" | "band" | "song" | "all" | "artists";
+export type SearchRequest = { name: string; type: SearchType; offset?: number };
 export type SearchResult = {
   id: string;
-  entity: "artist" | "work";
+  entity: "artist" | "work" | "recording" | "release-group";
   name: string;
   kind: string | null;
   country: string | null;
@@ -15,4 +15,10 @@ export type SearchResponse = {
   total: number;
   limit: number;
   partial: boolean;
+  groups?: {
+    type: "artists" | "song";
+    total: number | null;
+    results: SearchResult[];
+    error?: string;
+  }[];
 };

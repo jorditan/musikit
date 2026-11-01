@@ -107,8 +107,52 @@ test("unified search includes people, bands and works under the same queue", asy
   assert.equal(urls[0].searchParams.get("query"), 'artist:"Yes"');
   assert.deepEqual(
     data.results.map((result) => result.id),
-    ["band", "work", "person"],
+    ["band", "person", "work"],
   );
   assert.equal(data.total, 3);
   assert.equal(data.partial, false);
+});
+
+test("category pagination uses upstream offsets and stops at the last page", () => {
+  for (const offset of ["-1", "1.5", "NaN", "100001"]) {
+    assert.throws(() =>
+      parseSearch(new URLSearchParams("name=Yes&offset=" + offset)),
+    );
+  }
+  const query = parseSearch(
+    new URLSearchParams("name=Yes&type=artists&offset=20"),
+  );
+  const url = searchUrl(query);
+  assert.equal(url.searchParams.get("offset"), "20");
+  assert.equal(url.searchParams.get("limit"), "20");
+  assert.equal(url.searchParams.get("query"), 'artist:"Yes"');
+  const data = normalize(
+    { count: 21, artists: [{ id: "last", name: "Yes" }] },
+    query,
+  );
+  assert.equal(data.limit, 20);
+  assert.equal(data.partial, false);
+});
+
+test("grouped search preserves successful category when the other source fails", async () => {
+  const client = createMusicBrainzClient({
+    interval: 0,
+    fetcher: async (input) => {
+      if (String(input).includes("/work?"))
+        return new Response("", { status: 503 });
+      return Response.json({
+        count: 800,
+        artists: Array.from({ length: 5 }, (_, index) => ({
+          id: String(index),
+          name: "Yes",
+        })),
+      });
+    },
+  });
+  const data = await client({ name: "Yes", type: "all" });
+  assert.equal(data.groups?.[0].total, 800);
+  assert.equal(data.groups?.[0].results.length, 5);
+  assert.equal(data.groups?.[1].total, null);
+  assert.ok(data.groups?.[1].error);
+  assert.equal(data.results.length, 5);
 });

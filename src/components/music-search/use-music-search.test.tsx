@@ -116,4 +116,26 @@ describe("search preview", () => {
     expect(hook.result.current.query.data).toBeUndefined();
     expect(hook.result.current.selected).toBeNull();
   });
+
+  it("keeps category pagination through debounce and resets it on new text", async () => {
+    const hook = setup();
+    act(() => hook.result.current.changeName("Yes"));
+    act(() => hook.result.current.browse("artists", 20));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700);
+    });
+    expect(hook.result.current.submitted).toEqual({
+      name: "Yes",
+      type: "artists",
+      offset: 20,
+    });
+    act(() => hook.result.current.changeName("Genesis"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(650);
+    });
+    expect(hook.result.current.submitted).toEqual({
+      name: "Genesis",
+      type: "all",
+    });
+  });
 });

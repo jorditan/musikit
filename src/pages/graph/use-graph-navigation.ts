@@ -8,7 +8,10 @@ function currentGraph(): SearchResult | null {
   return result &&
     typeof result.id === "string" &&
     typeof result.name === "string" &&
-    (result.entity === "work" || result.entity === "artist") &&
+    (result.entity === "work" ||
+      result.entity === "artist" ||
+      result.entity === "release-group" ||
+      result.entity === "recording") &&
     Array.isArray(result.languages)
     ? result
     : null;

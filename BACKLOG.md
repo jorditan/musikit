@@ -4,6 +4,23 @@ Trabajamos con entregables pequeños: implementar un ticket, probar el flujo com
 
 ## Estado actual
 
+### Migración a force-graph — 31/10/2026
+
+Decisión vigente del usuario: **force-graph 1.52.0 reemplaza React Flow/XYFlow**. Las menciones anteriores a React Flow se conservan abajo como historial y quedan sustituidas por esta decisión.
+
+- [x] Retirar `@xyflow/react` e integrar el paquete nativo `force-graph` en Canvas 2D.
+- [x] Mantener selección sin expansión, solicitudes explícitas, paginación e identidad musical.
+- [x] Conservar reducción de conexiones redundantes para todo tipo de entidad y todos los nodos originales.
+- [x] Distribución próxima al origen, arrastre de vecinos directos visibles, fijación al soltar y botón Reacomodar.
+- [x] Separar objetos mutables de simulación del estado React, conservar posiciones al expandir y limpiar motor/observadores al salir.
+- [x] Controles de zoom/centrado, iconos, temas, movimiento reducido y lista accesible.
+- [x] Actualizar README y notas de arquitectura, producto, diseño e índice en Obsidian.
+- [ ] Validación visual móvil/escritorio, temas, arrastre, teclado y densidad con grafos grandes. Navegador integrado bloqueado por error interno `constraints`.
+
+Pruebas nuevas del adaptador verifican continuidad de objetos/posiciones, selección, desplazamiento de vecinos, liberación de fijaciones, desmontaje y movimiento reducido. Contraer ramas, filtros y búsqueda contextual no se incorporan automáticamente por cambiar de biblioteca.
+
+La revisión de MVP del 30/10/2026 al final de este documento contiene la prioridad propuesta más reciente; las entregas anteriores se conservan como historial.
+
 - Base: React + TypeScript + Vite.
 - Instalación, build y lint verificados.
 - Primer flujo: buscar por nombre y tipo (artista, banda o canción) y mostrar resultados iniciales, sin detalles.
@@ -238,3 +255,132 @@ Criterios de aceptación:
 Evolución posterior (fuera de este ticket): resolver enlaces exactos documentados por la fuente o mediante integración de catálogo. Una obra WORK no equivale a una grabación concreta; antes de enlazar una pista exacta hay que identificar la interpretación. Evaluar APIs, permisos y cobertura vigentes cuando se aborde esta fase, sin asumir equivalencia entre los catálogos de Spotify y YouTube Music.
 
 Orden sugerido: validar MK-005 con el usuario; MK-007 como mejora pequeña opcional; MK-006 para expansión del grafo con relaciones reales. MK-005 continúa en prueba: abrir la página no verifica por sí solo arrastre, teclado, temas y navegación.
+
+## Revisión del MVP — búsqueda e identificación (30/10/2026)
+
+Motivo: el usuario encuentra demasiadas coincidencias sin poder recorrerlas, poca separación entre entidades, identificación difícil sin imágenes, metadatos insuficientes y una pantalla demasiado ancha. Los tickets siguientes son propuestas pendientes de implementación, no funcionalidades entregadas. Este orden propuesto reemplaza el orden sugerido anterior.
+
+### Evidencia y alcance
+
+- El backend consulta artistas y obras, intercala hasta diez filas y suma los totales. No expone paginación ni totales por categoría. La UI no permite explorar las coincidencias restantes. El ejemplo de unas 800 coincidencias es una observación del usuario, no una medición repetida en esta revisión.
+- Ya existen banderas SVG locales y nombres de países/idiomas en español en `result-metadata-view.tsx`. Solo se muestra bandera cuando hay país y un recurso correspondiente; falta comprobar qué recibe la búsqueda reportada y qué renderiza el navegador.
+- La normalización conserva nombre, entidad, tipo, país, idiomas y desambiguación. No conserva imágenes ni créditos musicales. Los metadatos ausentes no pueden resolverse solo con estilos.
+- El CSS vigente amplía `.site-shell` a 1800 px y elimina el ancho máximo de `.explore-entry`.
+- Mantener por ahora canción = composición (`work`). Hacer visible esa distinción. Incorporar grabaciones requiere un ticket y una decisión de producto separados.
+
+Propuesta de corte del MVP: encontrar e identificar una entidad, seleccionarla y explorar al menos una relación documentada. MK-008 a MK-011 mejoran la entrada; MK-005 debe completar su validación y MK-006 sigue siendo necesario para demostrar la promesa de conexiones musicales. Por acuerdo con el usuario, fotos de artistas y bandas (MK-012) forman parte del MVP. Portadas de versiones (MK-013) y enlaces a servicios (MK-007) quedan como evolución posterior. La ausencia de imagen en una entidad no bloquea el recorrido.
+
+### MK-008 — Separar y recorrer resultados de búsqueda
+
+Estado: implementado para prueba; pendiente revisión visual/interactiva. Prioridad: MVP. Primera entrega de búsqueda.
+
+Resultado: distinguir artistas/bandas de canciones y acceder a resultados más allá de la primera muestra.
+
+- Mantener un campo universal. En «Todo», mostrar secciones «Artistas y bandas» y «Canciones · composiciones», con hasta cinco sugerencias por sección, total propio y acción «Ver todos».
+- Ofrecer vistas «Todo», «Artistas y bandas» y «Canciones» después de buscar. La separación ocurre en resultados; no exige elegir un tipo antes de escribir.
+- «Ver todos» abre la categoría para la misma consulta, con páginas de 20 y controles Anterior/Siguiente. No paginar una mezcla artificial de dos índices.
+- Extender el contrato con categoría, posición de página y totales por categoría. Conservar la cola y cancelación; cachear por consulta, categoría y página. No cargar las cientos de coincidencias por anticipado.
+- Mantener el orden de cada fuente en esta entrega. El orden de artistas y obras no se presenta como una relevancia global ni como popularidad.
+
+Criterios de aceptación:
+1. «Yes» muestra categorías explícitas y permite llegar más allá de los diez resultados iniciales cuando existen. El contador describe la categoría y el rango real mostrado.
+2. «Ver todos», Anterior/Siguiente y volver del grafo conservan consulta y categoría; al cambiar el texto se reinicia la página.
+3. No se repite una entidad dentro de la página; conservar MBID + entidad y no fusionar homónimos.
+4. Carga, vacío, error y reintento no se confunden entre categorías. Si una fuente falla, los resultados de la otra se conservan y el total fallido no figura como cero.
+5. Probar navegación por teclado, respuestas tardías, última página y errores sin perder los resultados ya visibles.
+
+### MK-009 — Relevancia verificable de la búsqueda
+
+Estado: propuesto. Prioridad: MVP. Después de MK-008.
+
+Resultado: que una consulta conocida permita reconocer pronto la entidad buscada.
+
+- Armar un conjunto pequeño de búsquedas reales: Yes, Gustavo Cerati, Soda Stereo, Yesterday, nombres con tildes y homónimos. Registrar entidad esperada por MBID, categoría y posición observada antes/después.
+- Evaluar consulta y puntuación de MusicBrainz por índice; verificar capacidades vigentes antes de modificar el ranking. Probar coincidencia exacta de nombre y alias documentados; no introducir una supuesta popularidad sin fuente.
+- No prometer ranking global a partir de reordenar diez resultados locales. Si se priorizan coincidencias exactas mediante otra consulta, definir deduplicación, paginación y coste dentro del límite compartido.
+
+Criterios: la banda Yes exacta aparece entre las primeras cinco sugerencias de artistas/bandas; registrar resultados del resto del conjunto, explicar ambigüedades y no degradar casos existentes sin revisión. Verificar puntuación por índice, latencia y cantidad de solicitudes. La política final se documenta con la evidencia de esta prueba.
+
+### MK-010 — Identificación consistente y metadatos útiles
+
+Estado: propuesto. Prioridad: MVP. Puede entregarse sin proveedor de imágenes.
+
+Resultado: entender qué representa cada fila, incluso sin foto ni metadatos completos.
+
+- Icono estable por tipo (persona, grupo, composición), nombre destacado y etiqueta textual siempre visible. Usar «Composición» como aclaración de canción; no depender solo de color o icono.
+- Segunda línea: desambiguación y país para artistas/bandas; desambiguación e idioma para obras. Mantener alturas y espaciados coherentes sin reservar filas vacías para cada dato ausente.
+- Revisar datos adicionales disponibles en la respuesta de búsqueda (por ejemplo área o fechas) y conservar únicamente los que ayuden a distinguir entidades. No consultar detalles para cada fila.
+- Unificar el modelo de presentación usado por lista, nodo y panel. País asociado no significa nacionalidad y el idioma de una obra no determina un país.
+- Auditar las banderas existentes con país válido, ausente, código especial y recurso faltante. Mantener nombre textual y fallback de ubicación; no derivar bandera de idioma o nombre.
+- Mostrar «Información limitada» cuando no haya datos para desambiguar. Créditos de compositor o intérprete solo con relación explícita y rol correcto; el texto libre no acredita relaciones.
+
+Criterios: reconocer el tipo sin imagen; homónimos distinguibles con los datos disponibles; faltantes honestos; banderas y nombres legibles en Windows, móvil y ambos temas; mismo significado de los datos en búsqueda y grafo. Registrar un caso real con país y otro sin él para distinguir un fallo de render de una ausencia en la fuente.
+
+### MK-011 — Inicio y resultados compactos y centrados
+
+Estado: implementado para prueba; pendiente revisión visual en tamaños objetivo. Prioridad: MVP. Entrega pequeña independiente.
+
+Resultado: reducir el recorrido horizontal entre nombre, tipo y contexto.
+
+- Referencia aportada: [uiFromMars](https://uifrommars.com/). Tomar la intención de contenido editorial centrado y ancho contenido; los valores siguientes son propuestas para Musikit, no medidas extraídas de esa web. Se consultó su contenido; no se hizo comparación visual en navegador.
+- Probar contenedor de inicio de hasta 1120 px y buscador/lista de hasta 800 px, centrados; márgenes laterales de 16–24 px en móvil. Alinear título, campo y resultados en un mismo eje.
+- Reducir tamaño y espacio del hero al buscar; mantener filas compactas con texto alineado a la izquierda, controles cómodos y nombres largos legibles.
+- Aplicar el límite al inicio/búsqueda. El lienzo del grafo necesita su propia distribución adaptable para conservar espacio de exploración.
+
+Criterios: revisión a 360, 768, 1440 y 1920 px; sin scroll horizontal; resultados centrados; texto y foco sin recortes; teclado, zoom al 200 %, temas y movimiento reducido. Comparar capturas antes/después con el usuario para ajustar densidad.
+
+### MK-012 — Fotos de artistas y bandas mediante TheAudioDB
+
+Estado: acordado para el backlog; pendiente implementación. Prioridad: MVP.
+
+Resultado: reconocer artistas y bandas mediante miniaturas reales en los resultados, conservando MusicBrainz como fuente de identidad.
+
+- Integrar TheAudioDB desde el backend mediante lookup por MBID de artista (`artist-mb.php?i={mbid}`), documentado en su [API oficial](https://www.theaudiodb.com/free_music_api). No asociar imágenes solo por coincidencia de nombre.
+- Mostrar primero los resultados y solicitar imágenes únicamente para las entidades visibles. Cargar miniaturas de forma independiente, reservar su espacio y mantener el icono de tipo cuando falten o fallen, sin ocultar nombre, etiqueta ni metadatos.
+- Conservar URL, proveedor e identidad asociada en el contrato de imagen; reutilizar la asociación al seleccionar la entidad y mostrarla en su nodo/panel.
+- Cachear asociaciones y ausencias por proveedor + MBID con expiración; deduplicar solicitudes concurrentes y limitar la cola. Una respuesta tardía no debe asignarse a otra fila cuando cambie la consulta.
+- Configurar el acceso en el backend y documentar límites, atribución y condiciones vigentes. La documentación consultada el 30/10/2026 publica 30 solicitudes por minuto para el acceso gratuito; verificar el límite al implementar y respetarlo también durante paginación y reintentos.
+- Validar cobertura real con Yes, Soda Stereo y Gustavo Cerati, además de un homónimo y una entidad sin imagen. Registrar aciertos, ausencias, latencia y cantidad de consultas; no prometer cobertura completa.
+
+Criterios de aceptación:
+1. Las fotos disponibles corresponden al MBID solicitado; la prueba con homónimos no intercambia identidades.
+2. La búsqueda y selección funcionan antes de cargar imágenes y ante ausencia, error de imagen, timeout o límite del proveedor.
+3. Repetir una búsqueda reutiliza la caché; las solicitudes simultáneas de una misma entidad se deduplican y la cola respeta el límite configurado.
+4. Miniaturas sin saltos de distribución, con alternativa accesible coherente con el nombre visible; comprobar móvil, temas y navegación por teclado.
+5. Registrar resultados de la muestra real y probar respuesta tardía, fallo del proveedor y ausencia de imagen. Documentar configuración y ejecutar build, lint y pruebas pertinentes.
+
+### MK-013 — Portadas de versiones con identidad comprobada
+
+Estado: propuesto; pendiente implementación. Prioridad: posterior al MVP. Incremento separado de MK-012.
+
+Resultado: ilustrar canciones con una portada de una versión relacionada e identificar su intérprete y disco.
+
+- Resolver composición → grabación → lanzamiento mediante relaciones documentadas. Una composición no tiene una única portada; definir qué versión se muestra y explicitarlo en la interfaz.
+- Integrar [Cover Art Archive](https://musicbrainz.org/doc/Cover_Art_Archive/API) por MBID de lanzamiento, usando sus miniaturas. No buscar portadas únicamente por título.
+- Reutilizar carga independiente, caché y fallback de MK-012, conservando también los identificadores de grabación y lanzamiento que justifican la asociación.
+- Mantener el icono de composición si no se puede resolver una versión o no existe portada. Incorporar grabaciones como categoría de búsqueda requiere una decisión de producto adicional; este ticket no cambia el significado actual de canción.
+
+Criterios de aceptación: portada trazable a un lanzamiento relacionado, versión e intérprete explícitos, comprobación de una obra con varias interpretaciones y otra sin portada, y selección funcional ante ausencia o fallo. Registrar cobertura y coste de consultas sin bloquear la búsqueda inicial.
+
+### Orden y validación propuestos
+
+1. MK-011 para compactar la vista y MK-008 para separar/recorrer resultados, trabajando un ticket por vez.
+2. MK-010 para reconocer entidades y MK-012 para incorporar fotos al MVP; MK-009 para evaluar y mejorar relevancia con ejemplos comprobables.
+3. Completar validación de MK-005 e implementar MK-006 para cerrar el recorrido mínimo de descubrimiento.
+4. MK-007 y MK-013 como siguientes incrementos.
+
+Revisión documental: se contrastaron contrato, normalización, mezcla de resultados, componentes de metadatos y estilos actuales. No se modificó la aplicación ni se ejecutaron pruebas de UI en esta revisión; los criterios anteriores son verificaciones futuras, no resultados obtenidos.
+
+### Primera implementación para probar — 30/10/2026
+
+- MK-011: contenedor de inicio de 1120 px, contenido centrado de 800 px, titular y controles más compactos y filas con nombres de 20 px. El grafo conserva su ancho anterior.
+- MK-008: grupos con cinco sugerencias, totales independientes, selección de categoría, Ver todos y páginas de veinte con Anterior/Siguiente. Consulta, categoría y offset forman la clave de caché y se conservan al volver del grafo en la sesión; cambiar el texto reinicia la vista. Un fallo de una fuente conserva los resultados exitosos de la otra y se comunica como cobertura incompleta.
+- Adelanto de MK-010: iconos de persona/grupo/composición y etiqueta explícita Composición. El resto del ticket, el ranking MK-009 y las fotos MK-012 siguen pendientes.
+- Pruebas agregadas: offsets inválidos, última página, fallo parcial de una fuente, debounce sin sobrescribir categoría/página y controles de categoría/paginación renderizados. Se agregó el alias de la aplicación a Vitest para probar componentes reales.
+- Validación final: build y lint pasan; 17 pruebas pasan (7 de backend y 10 de hooks/componentes). Continúa el aviso existente de bundle mayor a 500 kB.
+- HTTP real a través de Vite: Yes devuelve 174 artistas y 845 obras en esta consulta; grupos de cinco. Categoría artistas: primera página con veinte y última con catorce, sin siguiente página. La consulta con offset 20 devolvió 503 de MusicBrainz en dos intentos; ese caso se comunica como error reintentable. No se afirma validación real exitosa de todas las páginas.
+- Pendiente: revisión visual móvil/escritorio, temas, zoom y foco con teclado. Browser no pudo navegar por un error interno (`constraints`); las pruebas de componentes no sustituyen esa revisión. Durante carga/cambio de página se oculta la lista anterior; conservarla y gestionar el foco durante esa transición queda como ajuste pendiente de MK-008.
+
+### Ajuste de física nativa — 31/10/2026
+
+Se retira el arrastre rígido de vecinos y la fijación automática implementados en la primera migración. El movimiento usa los valores nativos de amortiguación, repulsión, centrado y enfriamiento de force-graph, como el ejemplo medium-graph. Solo se conserva la distancia de enlace de 100 para los iconos/etiquetas. La red responde mediante fuerzas y sigue acomodándose al soltar; Reacomodar reactiva la simulación. Movimiento reducido y expansión manual se conservan. Se actualizaron las pruebas para comprobar que la aplicación no modifica ni fija a los vecinos durante el arrastre. La suavidad visual requiere validación en navegador.

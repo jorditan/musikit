@@ -11,6 +11,7 @@ export function MusicSearch({ search }: { search: MusicSearchController }) {
     validation,
     query,
     submit,
+    browse,
     changeName,
     selectResult,
     inputRef,
@@ -64,6 +65,26 @@ export function MusicSearch({ search }: { search: MusicSearchController }) {
           {validation}
         </p>
       )}
+      {submitted && (
+        <nav className="search-categories" aria-label="Categorías de búsqueda">
+          {(
+            [
+              ["all", "Todo"],
+              ["artists", "Artistas y bandas"],
+              ["song", "Canciones"],
+            ] as const
+          ).map(([type, label]) => (
+            <button
+              type="button"
+              key={type}
+              aria-pressed={submitted.type === type}
+              onClick={() => browse(type)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
       <div
         className="search-feedback"
         role="status"
@@ -76,9 +97,11 @@ export function MusicSearch({ search }: { search: MusicSearchController }) {
         )}
         {showResults && query.isSuccess && (
           <p>
-            {query.data.results.length
-              ? `${query.data.results.length} coincidencias para «${submitted.name}». Elegí una para continuar.`
-              : `No encontramos coincidencias para «${submitted.name}». Probá otro nombre.`}
+            {query.data.groups?.some((group) => group.error)
+              ? `Resultados incompletos para «${submitted.name}». Podés reintentar la categoría que falló.`
+              : query.data.results.length
+                ? `${query.data.results.length} coincidencias para «${submitted.name}». Elegí una para continuar.`
+                : `No encontramos coincidencias para «${submitted.name}». Probá otro nombre.`}
           </p>
         )}
         {selected && (
@@ -98,13 +121,105 @@ export function MusicSearch({ search }: { search: MusicSearchController }) {
       )}
       {showResults && query.isSuccess && (
         <>
-          {query.data.partial && (
-            <p className="muted results-note">
-              Primeras {query.data.results.length} coincidencias de{" "}
-              {query.data.total}. No representan todo el catálogo.
-            </p>
+          {query.data.groups ? (
+            query.data.groups.map((group) => (
+              <section
+                className="result-group"
+                key={group.type}
+                aria-label={
+                  group.type === "artists"
+                    ? "Artistas y bandas"
+                    : "Canciones · composiciones"
+                }
+              >
+                <div className="result-group-heading">
+                  <h3>
+                    {group.type === "artists"
+                      ? "Artistas y bandas"
+                      : "Canciones · composiciones"}{" "}
+                    <span>{group.total?.toLocaleString("es-AR") ?? "—"}</span>
+                  </h3>
+                  {!!group.total && (
+                    <Button
+                      variant="outline"
+                      onClick={() => browse(group.type)}
+                    >
+                      Ver todos
+                    </Button>
+                  )}
+                </div>
+                {group.error ? (
+                  <div role="alert">
+                    <p>{group.error}</p>
+                    <Button
+                      variant="outline"
+                      onClick={() => browse(group.type)}
+                    >
+                      Reintentar categoría
+                    </Button>
+                  </div>
+                ) : group.results.length ? (
+                  <SearchPreview
+                    results={group.results}
+                    onSelect={selectResult}
+                  />
+                ) : (
+                  <p className="muted">Sin coincidencias en esta categoría.</p>
+                )}
+              </section>
+            ))
+          ) : (
+            <>
+              <p className="muted results-note">
+                {query.data.results.length
+                  ? (submitted.offset ?? 0) +
+                    1 +
+                    "–" +
+                    ((submitted.offset ?? 0) + query.data.results.length) +
+                    " de " +
+                    query.data.total +
+                    " coincidencias"
+                  : "Sin coincidencias en esta página."}
+              </p>
+              <SearchPreview
+                results={query.data.results}
+                onSelect={selectResult}
+              />
+              <nav
+                className="search-pagination"
+                aria-label="Páginas de resultados"
+              >
+                <Button
+                  variant="outline"
+                  disabled={!submitted.offset}
+                  onClick={() =>
+                    browse(
+                      submitted.type,
+                      Math.max(0, (submitted.offset ?? 0) - query.data.limit),
+                    )
+                  }
+                >
+                  Anterior
+                </Button>
+                <span>
+                  Página{" "}
+                  {Math.floor((submitted.offset ?? 0) / query.data.limit) + 1}
+                </span>
+                <Button
+                  variant="outline"
+                  disabled={!query.data.partial}
+                  onClick={() =>
+                    browse(
+                      submitted.type,
+                      (submitted.offset ?? 0) + query.data.limit,
+                    )
+                  }
+                >
+                  Siguiente
+                </Button>
+              </nav>
+            </>
           )}
-          <SearchPreview results={query.data.results} onSelect={selectResult} />
         </>
       )}
       {selected && (

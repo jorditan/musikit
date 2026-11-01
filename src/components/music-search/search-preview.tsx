@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "motion/react";
 import { Check, ArrowUpRight } from "lucide-react";
+import { EntityArtwork } from "./entity-artwork";
 import type { SearchResult } from "../../../shared/search";
 import { resultLabel } from "./result-metadata";
 import { ResultMetadata } from "./result-metadata-view";
@@ -25,13 +26,16 @@ export function SearchPreview({ results, onSelect }: Props) {
             className="result-option"
             onClick={() => onSelect(result)}
           >
-            <span className="result-heading">
-              <span className="result-name">{result.name}</span>
-              <span className="result-kind">{resultLabel(result)}</span>
-              <ArrowUpRight size={18} aria-hidden="true" />
-            </span>
-            <span className="result-metadata">
-              <ResultMetadata result={result} />
+            <EntityArtwork result={result} />
+            <span className="result-copy">
+              <span className="result-heading">
+                <span className="result-name">{result.name}</span>
+                <span className="result-kind">{resultLabel(result)}</span>
+                <ArrowUpRight size={18} aria-hidden="true" />
+              </span>
+              <span className="result-metadata">
+                <ResultMetadata result={result} />
+              </span>
             </span>
           </button>
         </li>

@@ -5,7 +5,7 @@ import type { MusicSearchController } from "@/components/music-search/use-music-
 export function ExplorePage({ search }: { search: MusicSearchController }) {
   const hasSearched = search.submitted !== null;
   return (
-    <SiteLayout>
+    <SiteLayout compact>
       <div
         className={hasSearched ? "explore-entry has-results" : "explore-entry"}
       >

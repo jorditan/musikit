@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { SearchRequest, SearchResult } from "../../../shared/search";
+import type {
+  SearchRequest,
+  SearchResult,
+  SearchType,
+} from "../../../shared/search";
 import { fetchResults } from "./search-api";
 
 export function useMusicSearch() {
@@ -23,7 +27,12 @@ export function useMusicSearch() {
   useEffect(() => {
     if (!name.trim() || selected) return;
     const timer = setTimeout(
-      () => setSubmitted({ name: name.trim(), type: "all" }),
+      () =>
+        setSubmitted((current) =>
+          current?.name === name.trim()
+            ? current
+            : { name: name.trim(), type: "all" },
+        ),
       650,
     );
     return () => clearTimeout(timer);
@@ -52,6 +61,12 @@ export function useMusicSearch() {
     if (submitted?.name === trimmed) void query.refetch();
     else setSubmitted({ name: trimmed, type: "all" });
   }
+  function browse(type: SearchType, offset = 0) {
+    if (!name.trim()) return;
+    void client.cancelQueries({ queryKey: ["music-search"] });
+    setSelected(null);
+    setSubmitted({ name: name.trim(), type, offset });
+  }
   function selectResult(result: SearchResult) {
     setSelected(result);
   }
@@ -62,6 +77,7 @@ export function useMusicSearch() {
     validation,
     query,
     submit,
+    browse,
     changeName,
     selectResult,
     inputRef,
